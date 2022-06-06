@@ -1,0 +1,59 @@
+# Faculdade de Computa¸c~ao
+# Universidade Federal de Mato Grosso do Sul
+# Arquitetura de Computadores II
+# Prof. Renan Albuquerque Marks
+#
+# Exemplo de c´odigo de montagem de um algoritmo
+# Se¸c~ao de texto do programa.
+# Usada para informar as instru¸c~oes MIPS do programa.
+.text
+# start()
+#------------
+_start:
+addi $sp, $sp, -4 # Aloca Stack-Frame 1 palavra
+sw $ra, 0($sp) # Salva Callee-save
+jal main # main()
+lw $ra, 0($sp) # Restaura Callee-save
+addi $sp, $sp, 4 # Desaloca Stack-Frame 1 palavra
+addi $v0, $zero, 10 # C´odigo 10 (exit system call)
+syscall # Chamada de sistema para finaliza¸c~ao
+# int media(int a, int b)
+#------------
+media:
+addi $sp, $sp, -8 # Aloca espa¸co para 2 int’s
+sw $fp, 4 ($sp) # Salva $fp (callee-save)
+sw $s0, 0 ($sp) # Salva $s0 (callee-save)
+addi $fp, $sp, 4 # $fp = in´ıcio do stack-frame
+add $s0, $a0, $a1 # $s0 = a+b
+addi $t0, $zero, 2 # $t0 = 2
+div $s0, $t0 # (a+b) / 2
+mfhi $v0 # $v0 = quociente
+lw $fp, 4 ($sp) # Restaura $fp (callee-save)
+lw $s0, 0 ($sp) # Restaura $s0 (callee-save)
+addi $sp, $sp, 8 # Desaloca espaco de 2 int’s
+jr $ra
+# main()
+#------------
+main:
+addi $sp, $sp, -16 # Aloca espa¸co para 4 int’s
+sw $fp, 12 ($sp) # Salva $fp (callee-save)
+sw $ra, 8 ($sp) # Salva $ra (callee-save)
+addi $fp, $sp, 12 # $fp aponta p/ in´ıcio do stack-frame
+addi $a0, $zero, 1
+addi $a1, $zero, 3
+sw $t0, 4 ($sp) # Salva msg (caller-save)
+jal media # $v0 = media(1,3)
+addi $a0, $zero, 5
+addi $a1, $zero, 7
+sw $v0, 0 ($sp) # Salva $v0 de media(1,3) (caller-save)
+jal media # $v0 = media(5,7)
+add $v0, $zero, $zero # Retornar 0 na main
+lw $fp, 12 ($sp) # Restaura $fp (callee-save)
+lw $ra, 8 ($sp) # Restaura $ra (callee-save)
+addi $sp, $sp, 16 # Desaloca espa¸co para 4 int’s
+jr $ra
+# Se¸c~ao de dados do programa.
+# Usada para informar os dados usados no programa.
+.data
+vetor: .word 0, 0, 0, 0, 0 # "array" de 5 palavras
+tamanho: .word 5 # tamanho do "array"
