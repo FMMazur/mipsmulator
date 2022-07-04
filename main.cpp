@@ -4,6 +4,7 @@
 #include <sstream>
 
 #include "compiler.hpp"
+#include "CPU.hpp"
 
 int main(int argc, char **argv)
 {
@@ -28,22 +29,14 @@ int main(int argc, char **argv)
 
   Compiler compiler(source.str());
   
-  printf("Compilando...\n");
-  auto compiled = compiler.compile();
+  // printf("Compilando...\n");
+  auto compiled = compiler.compiled();
+  // printf("Compilado.\n");
 
-  auto dotFind = path.find_last_of(".");
+  Cpu cpu{compiled};
+  cpu.run();
+  cpu.print();
 
-  std::string outputFilename = argc == 3 ? argv[2] : dotFind != std::string::npos ? path.substr(0, dotFind) + ".bin" : "output.bin";
-
-  std::ofstream outputFile(std::string("./") + outputFilename, std::ios::binary);
-  if (!outputFile.is_open()) {
-    printf("Can't create file: %s.\n", outputFilename.c_str());
-    return EXIT_FAILURE;
-  }
-
-  outputFile.write(reinterpret_cast<char*>(compiled.data()), MEMORY_SIZE);
-
-  printf("Salvo em: %s\n", outputFilename.c_str());
 
   return 0;
 }

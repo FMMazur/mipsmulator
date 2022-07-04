@@ -15,6 +15,7 @@ public:
   explicit Compiler(std::string_view source);
 
   std::array<u8, MEMORY_SIZE> compile();
+  Memory compiled();
 
 private:
   std::string_view _source;

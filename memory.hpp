@@ -8,6 +8,8 @@ union Instruction
 {
 public:
   Instruction() : code(0) {}
+  
+  Instruction(u32 data) : code(data) {}
 
   Instruction(u8 opcode, u32 address)
   {
@@ -38,7 +40,7 @@ public:
   enum class Format {
     R,
     I,
-    J
+    J,
   };
 
 public:
@@ -76,6 +78,9 @@ public:
   void set(u32 idx, u32 code);
 
   inline Instruction* content() { return _content; }
+  
+  inline u32 load(u32 idx) { return reinterpret_cast<u32*>(_content)[idx];}
+  inline void store(u32 idx, u8 value) { reinterpret_cast<u8*>(_content)[idx] = value;}
 
 private:
   Instruction _content[MEMORY_SIZE / 4] = {};

@@ -19,3 +19,7 @@ std::array<u8, MEMORY_SIZE> Compiler::compile() {
 
   return compiled;
 }
+
+Memory Compiler::compiled() {
+  return _parser.parse(_source);
+}

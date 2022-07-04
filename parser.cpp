@@ -43,7 +43,7 @@ Parser::Parser() : labels{}, _currentMode{Mode::TEXT}
         {"j", {.format = Instruction::Format::J, .instruction = Instruction::formatJ(0x02)}},
         {"jr", {.format = Instruction::Format::R, .instruction = Instruction::formatR(0x00, 0x00, 0x08)}},
         {"jal", {.format = Instruction::Format::J, .instruction = Instruction::formatJ(0x03)}},
-    };
+        {"syscall", {.format = Instruction::Format::R, .instruction = Instruction::formatR(0x00, 0x00, 0x0C)}}};
 
     registers = {
         {"$zero", 0b00000},
@@ -85,10 +85,17 @@ Parser::Parser() : labels{}, _currentMode{Mode::TEXT}
 struct JumpInfo
 {
   u32 idx;
-  Instruction instruction;
   std::string label;
 
-  JumpInfo(u32 idx, Instruction instruction, std::string label) : idx{idx}, instruction{instruction}, label{label} {}
+  JumpInfo(u32 idx, std::string label) : idx{idx}, label{label} {}
+};
+
+struct BranchInfo
+{
+  u32 idx;
+  std::string label;
+
+  BranchInfo(u32 idx, std::string label) : idx{idx}, label{label} {}
 };
 
 Memory
@@ -101,12 +108,14 @@ Parser::parse(std::string_view source)
   Memory memory;
 
   std::vector<JumpInfo> jumps;
+  std::vector<BranchInfo> branchs;
 
   u32 idx = 0;
+  u32 dataIdx = 0;
 
   while (std::getline(lines, line))
   {
-    if (line.at(0) == '#')
+    if (line.size() == 0 || line.at(0) == '#')
     {
       continue;
     }
@@ -144,7 +153,7 @@ Parser::parse(std::string_view source)
       labels[label] = idx;
 
       // se não tiver código para ler, pular para a próxima iteração
-      std::string code = text.substr(foundLabel + 1);
+      std::string code = line.substr(foundLabel + 1);
       utils::trim(code);
 
       if (code.size() == 0)
@@ -154,6 +163,7 @@ Parser::parse(std::string_view source)
 
       // senão atualizo a stream da linha
       ssCurrentLine.str(code);
+      ssCurrentLine >> text;
     }
 
     auto commas = std::count(line.begin(), line.end(), ',');
@@ -224,13 +234,59 @@ Parser::parse(std::string_view source)
       case Instruction::Format::I:
       {
         std::string rs, rt;
-        u16 immediate{0};
 
         auto i = it.instruction.i;
 
+        if (text == "bne" || text == "beq")
+        {
+          u32 address{0};
+          std::string value;
+          ssCurrentLine >> rt >> rs >> value;
+          // Se a label já existe
+          if (labels.contains(value))
+          {
+            address = labels[value];
+          }
+          else
+          {
+            // se é um hexadecimal
+            if (value.starts_with("0x"))
+            {
+              address = std::stoul(value, nullptr, 16);
+            }
+            else if (std::all_of(value.begin(), value.end(), isdigit))
+            {
+              address = std::stoul(value, nullptr, 10);
+            }
+            else
+            {
+              // salva para parsear depois
+              branchs.push_back(BranchInfo(
+                  idx,
+                  value));
+
+              break;
+            }
+          }
+          instruction = Instruction(it.instruction.i.opcode, registers[rs], registers[rt], address);
+          break;
+        }
+
+        u16 immediate{0};
         if (commas == 2)
         {
-          ssCurrentLine >> rt >> rs >> immediate;
+          ssCurrentLine >> rt >> rs;
+          std::string immediateV;
+          ssCurrentLine >> immediateV;
+
+          if (immediateV.starts_with("0x"))
+          {
+            immediate = std::stoul(immediateV, nullptr, 16);
+          }
+          else
+          {
+            immediate = std::stoul(immediateV, nullptr, 10);
+          }
         }
         else if (commas == 1)
         {
@@ -239,7 +295,21 @@ Parser::parse(std::string_view source)
           utils::trim(withoutBraces);
           ssCurrentLine.str(withoutBraces);
 
-          ssCurrentLine >> rt >> immediate >> rs;
+          ssCurrentLine >> rt;
+
+          std::string immediateV;
+          ssCurrentLine >> immediateV;
+
+          if (immediateV.starts_with("0x"))
+          {
+            immediate = std::stoul(immediateV, nullptr, 16);
+          }
+          else
+          {
+            immediate = std::stoul(immediateV, nullptr, 10);
+          }
+
+          ssCurrentLine >> rs;
         }
 
         instruction = Instruction(i.opcode, registers[rs], registers[rt], immediate);
@@ -264,15 +334,16 @@ Parser::parse(std::string_view source)
           {
             address = std::stoul(value, nullptr, 16);
           }
+          else if (std::all_of(value.begin(), value.end(), isdigit))
+          {
+            address = std::stoul(value, nullptr, 10);
+          }
           else
           {
             // salva para parsear depois
             jumps.push_back(JumpInfo(
                 idx,
-                Instruction(it.instruction.j.opcode, 0x0),
                 value));
-
-            break;
           }
         }
 
@@ -282,11 +353,25 @@ Parser::parse(std::string_view source)
       default:
         break;
       }
-      break;
     }
+    break;
     case Mode::DATA:
-      // assert(false && "TODO");
-      break;
+    {
+      if (text == ".word")
+      {
+        u32 data;
+
+        while (ssCurrentLine >> std::hex >> data)
+        {
+          instruction = Instruction(data);
+
+          memory.set(idx / 4, instruction.code);
+          idx += 4;
+        }
+        continue;
+      }
+    }
+    break;
     default:
       break;
     }
@@ -301,8 +386,25 @@ Parser::parse(std::string_view source)
 
     try
     {
-      jump.instruction.j.address = labels[jump.label] - idx/4;
-      memory.set(jump.idx / 4, jump.instruction.code);
+      auto it = memory.get(jump.idx / 4);
+      it.j.address = labels[jump.label];
+      memory.set(jump.idx / 4, it.code);
+    }
+    catch (const std::out_of_range &oor)
+    {
+      std::cerr << oor.what() << std::endl;
+    }
+  }
+
+  for (size_t i = 0; i < branchs.size(); i++)
+  {
+    auto branch = branchs[i];
+
+    try
+    {
+      auto it = memory.get(branch.idx / 4);
+      it.j.address = labels[branch.label];
+      memory.set(branch.idx / 4, it.code);
     }
     catch (const std::out_of_range &oor)
     {

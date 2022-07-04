@@ -10,6 +10,7 @@
 # start()
 #------------
 _start:
+lui $t1, 123
 addi $sp, $sp, -4 # Aloca Stack-Frame 1 palavra
 sw $ra, 0($sp) # Salva Callee-save
 jal main # main()
@@ -36,6 +37,7 @@ jr $ra
 #------------
 main:
 addi $sp, $sp, -16 # Aloca espa¸co para 4 int’s
+addiu $sp, $sp, -16 # Aloca espa¸co para 4 int’s
 sw $fp, 12 ($sp) # Salva $fp (callee-save)
 sw $ra, 8 ($sp) # Salva $ra (callee-save)
 addi $fp, $sp, 12 # $fp aponta p/ in´ıcio do stack-frame
@@ -54,6 +56,7 @@ addi $sp, $sp, 16 # Desaloca espa¸co para 4 int’s
 jr $ra
 # Se¸c~ao de dados do programa.
 # Usada para informar os dados usados no programa.
+
 .data
-vetor: .word 0, 0, 0, 0, 0 # "array" de 5 palavras
+vetor: .word 0x1, 0x2, 0x3, 0x4, 59 # "array" de 5 palavras
 tamanho: .word 5 # tamanho do "array"
